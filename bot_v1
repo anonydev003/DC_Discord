@@ -1,1 +1,43 @@
+from bs4 import BeautifulSoup
+import requests, re
 
+# return gallery name and post information
+def check_gallery(gallery, minor=0):
+    if minor == 0:
+        url = 'http://gall.dcinside.com/board/lists/?id={}'.format(gallery)
+    elif minor == 1:
+        url = 'http://gall.dcinside.com/mgallery/board/lists/?id={}'.format(gallery)
+    try:
+        headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_10_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/39.0.2171.95 Safari/537.36'}
+        response = requests.get(url, headers = headers)
+        html = response.text  # .text returns decoded string & .content returns bytes
+
+        # create bs4 object using the html content
+        soup = BeautifulSoup(html, 'html.parser')
+
+        # gallery name
+        gallery_name = soup.title.string
+        print(gallery_name)
+        # post information
+        post_content = soup.find_all("tr", attrs={"class" : "ub-content us-post"})
+        for i in post_content:
+            post = i.text
+            post_type = re.findall(r"^\n.*?\n(.*?)\n", post)[0]
+            post_title = re.findall(r"^\n.*?\n.*?\n\n(.*?)\n", post)[0]
+            if re.findall(r"^\n.*?\n.*?\n\n.*?\n\[(.*?)\]", post):
+                post_num_comment = re.findall(r"^\n.*?\n.*?\n\n.*?\n\[(.*?)\]", post)[0]
+            else:
+                post_num_comment = 0
+            post_writer = re.findall(r"^\n.*?\n.*?\n\n.*?\n.*?\n\n(.*?)\n", post)[0]
+            post_date = re.findall(r"^\n.*?\n.*?\n\n.*?\n.*?\n\n.*?\n(.*?)\n", post)[0]
+            post_view = re.findall(r"^\n.*?\n.*?\n\n.*?\n.*?\n\n.*?\n.*?\n(.*?)\n", post)[0]
+            post_reco = re.findall(r"^\n.*?\n.*?\n\n.*?\n.*?\n\n.*?\n.*?\n.*?\n(.*?)\n", post)[0]
+
+            # print post information
+            print("말머리:{} 제목:{} 코멘트:{} 글쓴이:{} 작성일:{} 조회:{} 추천:{}".format(post_type,post_title,post_num_comment,post_writer,post_date,post_view,post_reco))
+    except:
+        print("갤러리이름과 마이너 변수를 확인해주세요.")
+   
+    return
+
+check_gallery(gallery='darkeden', minor=1)
