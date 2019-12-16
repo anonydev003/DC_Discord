@@ -1,8 +1,15 @@
 from bs4 import BeautifulSoup
 import requests, re
+import sqlite3
+from sqlite3 import Error
+import pandas as pd
 
 # return gallery name and post information
 def check_gallery(gallery, minor=0):
+    # convert gallery name in Korea to English
+    # use dictionary to do so ##############
+    
+
     if minor == 0:
         url = 'http://gall.dcinside.com/board/lists/?id={}'.format(gallery)
     elif minor == 1:
@@ -17,27 +24,175 @@ def check_gallery(gallery, minor=0):
 
         # gallery name
         gallery_name = soup.title.string
-        print(gallery_name)
         # post information
         post_content = soup.find_all("tr", attrs={"class" : "ub-content us-post"})
-        for i in post_content:
-            post = i.text
-            post_type = re.findall(r"^\n.*?\n(.*?)\n", post)[0]
-            post_title = re.findall(r"^\n.*?\n.*?\n\n(.*?)\n", post)[0]
-            if re.findall(r"^\n.*?\n.*?\n\n.*?\n\[(.*?)\]", post):
-                post_num_comment = re.findall(r"^\n.*?\n.*?\n\n.*?\n\[(.*?)\]", post)[0]
-            else:
-                post_num_comment = 0
-            post_writer = re.findall(r"^\n.*?\n.*?\n\n.*?\n.*?\n\n(.*?)\n", post)[0]
-            post_date = re.findall(r"^\n.*?\n.*?\n\n.*?\n.*?\n\n.*?\n(.*?)\n", post)[0]
-            post_view = re.findall(r"^\n.*?\n.*?\n\n.*?\n.*?\n\n.*?\n.*?\n(.*?)\n", post)[0]
-            post_reco = re.findall(r"^\n.*?\n.*?\n\n.*?\n.*?\n\n.*?\n.*?\n.*?\n(.*?)\n", post)[0]
+        # define lists for post information
+        list_number=[]; list_type=[]; list_title=[]; list_num_comment=[]; list_writer=[]; list_date=[]; list_view=[]; list_reco=[]
+        # separate gallery with 말머리 and gallery without 말머리
+        newline_count = post_content[0].text.count("\n")
+        # gallery with 말머리
+        if newline_count == 11:
+            for i in post_content:
+                post = i.text
+                post_number = re.findall(r"^\n(.*?)\n", post)[0]
+                list_number.append(int(post_number))
+                post_type = re.findall(r"^\n.*?\n(.*?)\n", post)[0]
+                list_type.append(post_type)
+                post_title = re.findall(r"^\n.*?\n.*?\n\n(.*?)\n", post)[0]
+                list_title.append(post_title)
+                if re.findall(r"^\n.*?\n.*?\n\n.*?\n\[(.*?)\]", post):
+                    post_num_comment = re.findall(r"^\n.*?\n.*?\n\n.*?\n\[(.*?)\]", post)[0]
+                    list_num_comment.append(post_num_comment)
+                else:
+                    post_num_comment = 0
+                    list_num_comment.append(post_num_comment)
+                post_writer = re.findall(r"^\n.*?\n.*?\n\n.*?\n.*?\n\n(.*?)\n", post)[0]
+                list_writer.append(post_writer)
+                post_date = re.findall(r"^\n.*?\n.*?\n\n.*?\n.*?\n\n.*?\n(.*?)\n", post)[0]
+                list_date.append(post_date)
+                post_view = re.findall(r"^\n.*?\n.*?\n\n.*?\n.*?\n\n.*?\n.*?\n(.*?)\n", post)[0]
+                list_view.append(post_view)
+                post_reco = re.findall(r"^\n.*?\n.*?\n\n.*?\n.*?\n\n.*?\n.*?\n.*?\n(.*?)\n", post)[0]
+                list_reco.append(post_reco)
 
-            # print post information
-            print("말머리:{} 제목:{} 코멘트:{} 글쓴이:{} 작성일:{} 조회:{} 추천:{}".format(post_type,post_title,post_num_comment,post_writer,post_date,post_view,post_reco))
+                # print post information
+                # print("글번호:{} 말머리:{} 제목:{} 코멘트:{} 글쓴이:{} 작성일:{} 조회:{} 추천:{}".format(post_number,post_type,post_title,post_num_comment,post_writer,post_date,post_view,post_reco))
+   
+            return gallery_name, list_number, list_type, list_title, list_num_comment, list_writer, list_date, list_view, list_reco
+
+        elif newline_count == 10:
+            for i in post_content:
+                post = i.text
+                post_number = re.findall(r"^\n(.*?)\n", post)[0]
+                list_number.append(int(post_number))
+                post_type = ""
+                list_type.append(post_type)
+                post_title = re.findall(r"^\n.*?\n\n(.*?)\n", post)[0]
+                list_title.append(post_title)
+                if re.findall(r"^\n.*?\n\n.*?\n\[(.*?)\]", post):
+                    post_num_comment = re.findall(r"^\n.*?\n\n.*?\n\[(.*?)\]", post)[0]
+                    list_num_comment.append(post_num_comment)
+                else:
+                    post_num_comment = 0
+                    list_num_comment.append(post_num_comment)
+                post_writer = re.findall(r"^\n.*?\n\n.*?\n.*?\n\n(.*?)\n", post)[0]
+                list_writer.append(post_writer)
+                post_date = re.findall(r"^\n.*?\n\n.*?\n.*?\n\n.*?\n(.*?)\n", post)[0]
+                list_date.append(post_date)
+                post_view = re.findall(r"^\n.*?\n\n.*?\n.*?\n\n.*?\n.*?\n(.*?)\n", post)[0]
+                list_view.append(post_view)
+                post_reco = re.findall(r"^\n.*?\n\n.*?\n.*?\n\n.*?\n.*?\n.*?\n(.*?)\n", post)[0]
+                list_reco.append(post_reco)
+
+                # print post information
+                # print("글번호:{} 제목:{} 코멘트:{} 글쓴이:{} 작성일:{} 조회:{} 추천:{}".format(post_number,post_title,post_num_comment,post_writer,post_date,post_view,post_reco))
+   
+            return gallery_name, list_number, list_type, list_title, list_num_comment, list_writer, list_date, list_view, list_reco
     except:
         print("갤러리이름과 마이너 변수를 확인해주세요.")
-   
-    return
 
-check_gallery(gallery='darkeden', minor=1)
+def create_connection(db_file):
+    conn = None
+    try:
+        conn = sqlite3.connect(db_file)
+        return conn
+    except Error as e:
+        print(e)
+    return conn
+
+def create_table_sql(gallery_name):
+    sql = """ CREATE TABLE IF NOT EXISTS {} (
+                id integer PRIMARY KEY,
+                post_number text,
+                post_type text,
+                post_title text,
+                post_num_comment text,
+                post_writer text,
+                post_date text,
+                post_view text,
+                post_reco text
+                ); """.format(gallery_name)
+    return sql
+
+def create_table(conn, script):
+    try:
+        cur = conn.cursor()
+        cur.execute(script)
+        conn.commit()
+    except Error as e:
+        print(e)
+
+def create_instance(conn, gallery_name, instance_attrs):
+    sql = '''INSERT INTO {}(post_number,post_type,post_title,post_num_comment,post_writer,post_date,post_view,post_reco)
+            VALUES(?,?,?,?,?,?,?,?)'''.format(gallery_name)
+    cur = conn.cursor()
+    cur.execute(sql, instance_attrs)
+    conn.commit()
+    return cur.lastrowid
+
+def delete_instance(conn, gallery_name):
+    sql = 'DELETE FROM {}'.format(gallery_name)
+    cur = conn.cursor()
+    cur.execute(sql)
+    conn.commit()
+
+def show_gallery_list(conn):
+    cur = conn.cursor()
+    cur.execute('SELECT name from sqlite_master where type= "table"')
+    gall_list = cur.fetchall()
+    for i in range(len(gall_list)):
+        print(gall_list[i][0], end="  ")
+        i += 1
+
+def new_content(gallery_name_Eng, minor):
+    global conn
+    # web-crawl gallery
+    """gallery contains gallery_name and lists of post_number, post_type, post_title,
+                                                  post_num_comment,post_writer,post_date,
+                                                  post_view,post_reco"""
+    gallery = check_gallery(gallery_name_Eng, minor)
+
+    gallery_name_Kor = gallery[0]
+    if " " in gallery_name_Kor:
+        gallery_name_Kor = gallery_name_Kor.replace(" ","_")
+
+    create_table(conn, create_table_sql(gallery_name_Kor))
+
+    # load table
+    df1 = pd.read_sql_query("SELECT * from {}".format(gallery_name_Kor), conn)
+    df1.drop("id", axis=1, inplace=True)
+
+    # delete old instances
+    delete_instance(conn, gallery_name_Kor)
+
+    # update table
+    for i in range(len(gallery[1])):
+            script = (gallery[1][i],gallery[2][i],gallery[3][i],gallery[4][i],gallery[5][i],gallery[6][i],gallery[7][i],gallery[8][i])
+            create_instance(conn, gallery_name_Kor, script)
+            i += 1
+
+    # return new content
+    df2 = pd.read_sql_query("SELECT * from {}".format(gallery_name_Kor), conn)
+    df2.drop("id", axis=1, inplace=True)
+    df3 = pd.concat([df1,df2])
+    df3 = df3.drop_duplicates(subset=["post_number"], keep=False)
+    if df3.empty:
+        df3 = ""
+    return df3
+
+if __name__ == "__main__":
+    # connect to database
+    conn = create_connection("./DC_Gall.db")
+
+    # execute sql commands
+    if conn is not None:
+        gallery_name_Eng = "darkeden"
+        minor = 1
+        content = new_content(gallery_name_Eng, minor)
+        print("New Content:\n{}".format(content))
+        
+    else:
+        print("Error: cannot create database connection")
+
+    # close connection
+    conn.close()
