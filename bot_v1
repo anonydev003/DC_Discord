@@ -140,9 +140,18 @@ def show_gallery_list(conn):
     cur = conn.cursor()
     cur.execute('SELECT name from sqlite_master where type= "table"')
     gall_list = cur.fetchall()
+    print("갤러리 리스트:", end=" ")
     for i in range(len(gall_list)):
         print(gall_list[i][0], end="  ")
         i += 1
+
+def add_gallery(gallery_name_Eng):
+    global gallery_list
+    gallery_list.append(gallery_name_Eng)
+
+def remove_gallery(gallery_name_Eng):
+    global gallery_list
+    gallery_list.remove(gallery_name_Eng)
 
 def new_content(gallery_name_Eng, minor):
     global conn
@@ -176,11 +185,20 @@ def new_content(gallery_name_Eng, minor):
     df2.drop("id", axis=1, inplace=True)
     df3 = pd.concat([df1,df2])
     df3 = df3.drop_duplicates(subset=["post_number"], keep=False)
+    df3_announce = df3.loc[df3.post_type == "공지"]
+    df3_content = df3.loc[df3.post_type != "공지"]
+    df3_content = df3_content.sort_values(by=["post_number"], ascending=False)
+    df3 = pd.concat([df3_announce, df3_content])
+    df3 = df3.loc[df3.post_number > max(df1.post_number.tolist())]
     if df3.empty:
         df3 = ""
+    
     return df3
 
 if __name__ == "__main__":
+    # define gallery to crawl
+    gallery_list = []
+
     # connect to database
     conn = create_connection("./DC_Gall.db")
 
@@ -189,6 +207,7 @@ if __name__ == "__main__":
         gallery_name_Eng = "darkeden"
         minor = 1
         content = new_content(gallery_name_Eng, minor)
+        print()
         print("New Content:\n{}".format(content))
         
     else:
