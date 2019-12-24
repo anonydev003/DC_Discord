@@ -246,18 +246,12 @@ def crawl(gallery_list):
             content = new_content(gall)
             gall_table = content[0] + "_"
             create_table(conn, create_table_sql2(gall_table))
-            ###
-            print(gall)
-            print(content[0])
-            print(content[1])
-            ###
-            if content[1] == "":
-                pass
-            else:
+            try:
                 for i in range(content[1].shape[0]):
                     script = (content[1].iloc[i,0], content[1].iloc[i,1], content[1].iloc[i,2])
                     create_instance2(conn, gall_table, script)
-            
+            except:
+                pass     
     else:
         print("Error: 데이터베이스 연결을 확인해주세요.")
 
@@ -271,7 +265,7 @@ class MyThread(Thread):
         self.gallery_list = gallery_list
 
     def run(self):
-        while not self.stopped.wait(10):
+        while not self.stopped.wait(5):
             crawl(self.gallery_list)
 
 client = discord.Client()
@@ -338,6 +332,14 @@ async def on_message(message):
 
     if message.content == '!시작':
         start = 1
+        try:
+            conn = create_connection("./DC_Gall.db")
+            for gall in gallery_list:
+                gall_table = gall + "_"
+                delete_instance(conn, gall_table)
+            conn.close()
+        except:
+            pass
         while start == 1:
             if len(gallery_list) == 0:
                 pass
@@ -350,11 +352,13 @@ async def on_message(message):
                         if df.size == 0:
                             pass
                         else:
-                            msg1 = gall
-                            await message.channel.send(msg1)
+                            msg1 = gall + " 갤러리"
                             for i in range(df.shape[0]):
-                                msg2 = "제목: {} 글쓴이: {} 날짜: {}".format(df.iloc[1,0],df.iloc[1,1],df.iloc[1,2])
-                                await message.channel.send(msg2)   
+                                await message.channel.send(msg1)
+                                msg2 = "제목: {} 글쓴이: {} 날짜: {}".format(df.iloc[i,1],df.iloc[i,2],df.iloc[i,3])
+                                await message.channel.send(msg2) 
+                                await message.channel.send("ㅤ")
+                        delete_instance(conn, gall_table)
                     conn.close()
                 except:
                     pass
@@ -381,7 +385,7 @@ if __name__ == "__main__":
     thread.start()
 
     # define discord bot token
-    token = 'NjU4NjgxOTU0MjQxMDg1NDYw.XgDUEg.HZK8ogr0tCk3pY9qo-u99ZG0a4g'
+    token = 'NjU4NjgxOTU0MjQxMDg1NDYw.XgI5Lw.CPkNWPaPp4LQqv3Tk4b0fjdkQkw'
     # token = input('봇 토큰을 입력해주세요: ')
     
     # run bot
