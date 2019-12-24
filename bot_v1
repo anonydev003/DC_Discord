@@ -1,15 +1,24 @@
 from bs4 import BeautifulSoup
 import requests, re
-import sqlite3
+import sqlite3, time
 from sqlite3 import Error
 import pandas as pd
+from multiprocessing import Process, Manager
+from threading import Thread, Timer, Event
+import os, discord, asyncio
 
 # return gallery name and post information
-def check_gallery(gallery, minor=0):
-    # convert gallery name in Korea to English
-    # use dictionary to do so ##############
-    
+def check_gallery(gallery):
+    global gall_dict
 
+    # convert gallery from Eng to Kor & define minor variable
+    if gallery in gall_dict.keys():
+        minor = gall_dict[gallery][1]
+        gallery = gall_dict[gallery][0]
+    else: 
+        msg = "갤러리 이름을 확인해주세요."
+        return msg
+    
     if minor == 0:
         url = 'http://gall.dcinside.com/board/lists/?id={}'.format(gallery)
     elif minor == 1:
@@ -54,9 +63,6 @@ def check_gallery(gallery, minor=0):
                 list_view.append(post_view)
                 post_reco = re.findall(r"^\n.*?\n.*?\n\n.*?\n.*?\n\n.*?\n.*?\n.*?\n(.*?)\n", post)[0]
                 list_reco.append(post_reco)
-
-                # print post information
-                # print("글번호:{} 말머리:{} 제목:{} 코멘트:{} 글쓴이:{} 작성일:{} 조회:{} 추천:{}".format(post_number,post_type,post_title,post_num_comment,post_writer,post_date,post_view,post_reco))
    
             return gallery_name, list_number, list_type, list_title, list_num_comment, list_writer, list_date, list_view, list_reco
 
@@ -64,8 +70,12 @@ def check_gallery(gallery, minor=0):
             for i in post_content:
                 post = i.text
                 post_number = re.findall(r"^\n(.*?)\n", post)[0]
-                list_number.append(int(post_number))
-                post_type = ""
+                if post_number.isdigit():
+                    list_number.append(int(post_number))
+                    post_type = ""
+                else:
+                    list_number.append(0)
+                    post_type = "공지"
                 list_type.append(post_type)
                 post_title = re.findall(r"^\n.*?\n\n(.*?)\n", post)[0]
                 list_title.append(post_title)
@@ -83,21 +93,18 @@ def check_gallery(gallery, minor=0):
                 list_view.append(post_view)
                 post_reco = re.findall(r"^\n.*?\n\n.*?\n.*?\n\n.*?\n.*?\n.*?\n(.*?)\n", post)[0]
                 list_reco.append(post_reco)
-
-                # print post information
-                # print("글번호:{} 제목:{} 코멘트:{} 글쓴이:{} 작성일:{} 조회:{} 추천:{}".format(post_number,post_title,post_num_comment,post_writer,post_date,post_view,post_reco))
    
             return gallery_name, list_number, list_type, list_title, list_num_comment, list_writer, list_date, list_view, list_reco
     except:
-        print("갤러리이름과 마이너 변수를 확인해주세요.")
+        print("Error: 갤러리이름과 마이너 변수를 확인해주세요.")
 
 def create_connection(db_file):
     conn = None
     try:
         conn = sqlite3.connect(db_file)
         return conn
-    except Error as e:
-        print(e)
+    except:
+        print("Error: 데이터베이스 연결을 확인해주세요.")
     return conn
 
 def create_table_sql(gallery_name):
@@ -114,17 +121,34 @@ def create_table_sql(gallery_name):
                 ); """.format(gallery_name)
     return sql
 
+def create_table_sql2(gallery_name):
+    sql = """ CREATE TABLE IF NOT EXISTS {} (
+                id integer PRIMARY KEY,
+                post_title text,
+                post_writer text,
+                post_date text
+                ); """.format(gallery_name)
+    return sql
+
 def create_table(conn, script):
     try:
         cur = conn.cursor()
         cur.execute(script)
         conn.commit()
-    except Error as e:
-        print(e)
+    except:
+        print("Error: 데이터베이스 연결을 확인해주세요.")
 
 def create_instance(conn, gallery_name, instance_attrs):
     sql = '''INSERT INTO {}(post_number,post_type,post_title,post_num_comment,post_writer,post_date,post_view,post_reco)
             VALUES(?,?,?,?,?,?,?,?)'''.format(gallery_name)
+    cur = conn.cursor()
+    cur.execute(sql, instance_attrs)
+    conn.commit()
+    return cur.lastrowid
+
+def create_instance2(conn, gallery_name, instance_attrs):
+    sql = '''INSERT INTO {}(post_title,post_writer,post_date)
+            VALUES(?,?,?)'''.format(gallery_name)
     cur = conn.cursor()
     cur.execute(sql, instance_attrs)
     conn.commit()
@@ -140,30 +164,35 @@ def show_gallery_list(conn):
     cur = conn.cursor()
     cur.execute('SELECT name from sqlite_master where type= "table"')
     gall_list = cur.fetchall()
-    print("갤러리 리스트:", end=" ")
-    for i in range(len(gall_list)):
-        print(gall_list[i][0], end="  ")
-        i += 1
+    return gall_list
 
-def add_gallery(gallery_name_Eng):
+def drop_all(conn):
+    cur = conn.cursor()
+    cur.execute('SELECT name from sqlite_master where type= "table"')
+    gall_list = cur.fetchall()
+    for gall in gall_list:
+        script = "DROP TABLE " + gall[0]
+        cur.execute(script)
+
+def add_gallery(gallery_name_Kor):
     global gallery_list
-    gallery_list.append(gallery_name_Eng)
+    gallery_list.append(gallery_name_Kor)
 
-def remove_gallery(gallery_name_Eng):
+def remove_gallery(gallery_name_Kor):
     global gallery_list
-    gallery_list.remove(gallery_name_Eng)
+    gallery_list.remove(gallery_name_Kor)
 
-def new_content(gallery_name_Eng, minor):
+def new_content(gallery_name_Kor):
     global conn
     # web-crawl gallery
     """gallery contains gallery_name and lists of post_number, post_type, post_title,
                                                   post_num_comment,post_writer,post_date,
                                                   post_view,post_reco"""
-    gallery = check_gallery(gallery_name_Eng, minor)
+    gallery = check_gallery(gallery_name_Kor)
 
-    gallery_name_Kor = gallery[0]
-    if " " in gallery_name_Kor:
-        gallery_name_Kor = gallery_name_Kor.replace(" ","_")
+    if gallery == "갤러리 이름을 확인해주세요.":
+        msg = "갤러리 이름을 확인해주세요."
+        return msg
 
     create_table(conn, create_table_sql(gallery_name_Kor))
 
@@ -189,29 +218,172 @@ def new_content(gallery_name_Eng, minor):
     df3_content = df3.loc[df3.post_type != "공지"]
     df3_content = df3_content.sort_values(by=["post_number"], ascending=False)
     df3 = pd.concat([df3_announce, df3_content])
-    df3 = df3.loc[df3.post_number > max(df1.post_number.tolist())]
+    if df1.empty == 0:
+        df3 = df3.loc[df3.post_number > max(df1.post_number.tolist())]
+    df3 = df3.loc[:,["post_title","post_writer","post_date"]]
+    df3.style.set_properties(**{'text-align': 'left'})
     if df3.empty:
         df3 = ""
     
-    return df3
+    return gallery_name_Kor, df3
 
-if __name__ == "__main__":
-    # define gallery to crawl
-    gallery_list = []
-
+def crawl(gallery_list):
+    global conn, first, content
+    
     # connect to database
     conn = create_connection("./DC_Gall.db")
 
+    # drop all tables if first run
+    if first == 1:
+        drop_all(conn)
+        first = 0
+
     # execute sql commands
     if conn is not None:
-        gallery_name_Eng = "darkeden"
-        minor = 1
-        content = new_content(gallery_name_Eng, minor)
-        print()
-        print("New Content:\n{}".format(content))
-        
+        if len(gallery_list) == 0:
+            return
+        for gall in gallery_list:
+            content = new_content(gall)
+            gall_table = content[0] + "_"
+            create_table(conn, create_table_sql2(gall_table))
+            ###
+            print(gall)
+            print(content[0])
+            print(content[1])
+            ###
+            if content[1] == "":
+                pass
+            else:
+                for i in range(content[1].shape[0]):
+                    script = (content[1].iloc[i,0], content[1].iloc[i,1], content[1].iloc[i,2])
+                    create_instance2(conn, gall_table, script)
+            
     else:
-        print("Error: cannot create database connection")
+        print("Error: 데이터베이스 연결을 확인해주세요.")
 
     # close connection
     conn.close()
+
+class MyThread(Thread):
+    def __init__(self, event, gallery_list):
+        Thread.__init__(self)
+        self.stopped = event
+        self.gallery_list = gallery_list
+
+    def run(self):
+        while not self.stopped.wait(10):
+            crawl(self.gallery_list)
+
+client = discord.Client()
+
+@client.event
+async def on_ready():
+    for guild in client.guilds:
+        print(f'{guild} 서버와 연결되었습니다.')
+
+@client.event
+async def on_message(message):
+    global gall_dict, minor_dict, gallery_list, start
+    if message.author == client.user:
+        return
+
+    if message.content == '!리스트':
+        if len(gallery_list) == 0:
+            msg = "등록된 갤러리가 없습니다."
+            await message.channel.send(msg)
+        else:
+            msg = str(gallery_list)
+            msg = msg.replace('[','').replace(']','').replace("'",'')
+            await message.channel.send(msg)        
+
+    if '!추가' in message.content:
+        try:
+            gallery = re.findall(r'!추가\s(.*?)$',message.content)
+            gallery = gallery[0]
+            try:
+                if gallery not in gall_dict:
+                    msg = "갤러리 이름을 확인해주세요."
+                    await message.channel.send(msg)
+                    return
+                add_gallery(gallery)
+            except:
+                msg = "갤러리 이름을 확인해주세요."
+                await message.channel.send(msg)
+                return
+            msg = f"{gallery} 갤러리가 추가되었습니다."
+            await message.channel.send(msg)
+        except:
+            msg = '추가하실 갤러리를 입력해주세요. 예) !추가 HIT'
+            await message.channel.send(msg)
+
+    if '!삭제' in message.content:
+        try:
+            gallery = re.findall(r'!삭제\s(.*?)$',message.content)
+            gallery = gallery[0]
+            try:
+                if gallery not in gall_dict:
+                    msg = "갤러리 이름을 확인해주세요."
+                    await message.channel.send(msg)
+                    return
+                remove_gallery(gallery)
+            except:
+                msg = "갤러리 이름을 확인해주세요."
+                await message.channel.send(msg)
+                return
+            msg = f"{gallery} 갤러리가 삭제되었습니다."
+            await message.channel.send(msg)
+        except:
+            msg = '삭제하실 갤러리를 입력해주세요. 예) !삭제 HIT'
+            await message.channel.send(msg)
+
+    if message.content == '!시작':
+        start = 1
+        while start == 1:
+            if len(gallery_list) == 0:
+                pass
+            else:
+                try:
+                    conn = create_connection("./DC_Gall.db")
+                    for gall in gallery_list:
+                        gall_table = gall + "_"
+                        df = pd.read_sql_query("SELECT * from {}".format(gall_table), conn)
+                        if df.size == 0:
+                            pass
+                        else:
+                            msg1 = gall
+                            await message.channel.send(msg1)
+                            for i in range(df.shape[0]):
+                                msg2 = "제목: {} 글쓴이: {} 날짜: {}".format(df.iloc[1,0],df.iloc[1,1],df.iloc[1,2])
+                                await message.channel.send(msg2)   
+                    conn.close()
+                except:
+                    pass
+            await asyncio.sleep(5)
+        
+    if message.content == '!중지':
+        start = 0 
+
+if __name__ == "__main__":
+    # define global variables
+    first = 1
+    start = 1
+    gall_dict = {}
+    gall_dict['다크에덴'] = ('darkeden',1)
+    gall_dict['주식'] = ('stock_new2',0)
+    
+    # define gallery_list
+    gallery_list = Manager().list()
+    gallery_list = []
+
+    # define perpetual web crawler
+    stopFlag = Event()
+    thread = MyThread(stopFlag, gallery_list)
+    thread.start()
+
+    # define discord bot token
+    token = 'NjU4NjgxOTU0MjQxMDg1NDYw.XgDUEg.HZK8ogr0tCk3pY9qo-u99ZG0a4g'
+    # token = input('봇 토큰을 입력해주세요: ')
+    
+    # run bot
+    client.run(token)
+
