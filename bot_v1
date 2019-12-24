@@ -285,10 +285,12 @@ async def on_message(message):
         if len(gallery_list) == 0:
             msg = "등록된 갤러리가 없습니다."
             await message.channel.send(msg)
+            await message.channel.send("ㅤ")
         else:
             msg = str(gallery_list)
             msg = msg.replace('[','').replace(']','').replace("'",'')
-            await message.channel.send(msg)        
+            await message.channel.send(msg)    
+            await message.channel.send("ㅤ")    
 
     if '!추가' in message.content:
         try:
@@ -298,17 +300,21 @@ async def on_message(message):
                 if gallery not in gall_dict:
                     msg = "갤러리 이름을 확인해주세요."
                     await message.channel.send(msg)
+                    await message.channel.send("ㅤ")
                     return
                 add_gallery(gallery)
             except:
                 msg = "갤러리 이름을 확인해주세요."
                 await message.channel.send(msg)
+                await message.channel.send("ㅤ")
                 return
             msg = f"{gallery} 갤러리가 추가되었습니다."
             await message.channel.send(msg)
+            await message.channel.send("ㅤ")
         except:
             msg = '추가하실 갤러리를 입력해주세요. 예) !추가 HIT'
             await message.channel.send(msg)
+            await message.channel.send("ㅤ")
 
     if '!삭제' in message.content:
         try:
@@ -318,17 +324,21 @@ async def on_message(message):
                 if gallery not in gall_dict:
                     msg = "갤러리 이름을 확인해주세요."
                     await message.channel.send(msg)
+                    await message.channel.send("ㅤ")
                     return
                 remove_gallery(gallery)
             except:
                 msg = "갤러리 이름을 확인해주세요."
                 await message.channel.send(msg)
+                await message.channel.send("ㅤ")
                 return
             msg = f"{gallery} 갤러리가 삭제되었습니다."
             await message.channel.send(msg)
+            await message.channel.send("ㅤ")
         except:
             msg = '삭제하실 갤러리를 입력해주세요. 예) !삭제 HIT'
             await message.channel.send(msg)
+            await message.channel.send("ㅤ")
 
     if message.content == '!시작':
         start = 1
@@ -367,13 +377,60 @@ async def on_message(message):
     if message.content == '!중지':
         start = 0 
 
+def get_gall_dict():
+    url = 'https://gall.dcinside.com'
+    url2 = 'https://gall.dcinside.com/m'
+    headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_10_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/39.0.2171.95 Safari/537.36'}
+
+    # main gallery
+    response = requests.get(url, headers = headers)
+    html = response.text  # .text returns decoded string & .content returns bytes
+    soup = BeautifulSoup(html, 'html.parser')
+    anchors = soup.findAll('a', href=True)
+    eng_list = []
+    kor_list = []
+    for anchor in anchors:
+        anchor = str(anchor)
+        eng = re.findall(r'"https:\/\/gall\.dcinside\.com\/board\/lists\/\?id=(.*?)"',anchor)
+        kor = re.findall(r'"https:\/\/gall\.dcinside\.com\/board\/lists\/\?id=.*?".*?>(.*?)<\/a>',anchor)
+        if len(eng) == 0:
+            pass
+        else:
+            eng_list.append(eng[0])
+            kor_list.append(kor[0])
+
+    # minor gallery
+    response = requests.get(url2, headers = headers)
+    html = response.text  # .text returns decoded string & .content returns bytes
+    soup = BeautifulSoup(html, 'html.parser')
+    anchors = soup.findAll('a', href=True)
+    eng2_list = []
+    kor2_list = []
+    for anchor in anchors:
+        anchor = str(anchor)
+        eng2 = re.findall(r'"https:\/\/gall\.dcinside\.com\/mgallery\/board\/lists\/\?id=(.*?)"',anchor)
+        kor = re.findall(r'"https:\/\/gall\.dcinside\.com\/mgallery\/board\/lists\/\?id=.*?".*?>(.*?)<\/a>',anchor)
+        if len(eng2) == 0:
+            pass
+        else:
+            eng2_list.append(eng2[0])
+            kor2_list.append(kor[0])
+
+    # defind gallery dictionary 
+    gall_dict = {}
+    for i in range(len(eng_list)):
+        gall_dict[kor_list[i]] = (eng_list[i],0)
+    for j in range(len(eng2_list)):
+        gall_dict[kor2_list[j]] = (eng2_list[j],1)
+    gall_dict['다크에덴'] = ('darkeden,1')
+
+    return gall_dict
+
 if __name__ == "__main__":
     # define global variables
     first = 1
     start = 1
-    gall_dict = {}
-    gall_dict['다크에덴'] = ('darkeden',1)
-    gall_dict['주식'] = ('stock_new2',0)
+    gall_dict = get_gall_dict()
     
     # define gallery_list
     gallery_list = Manager().list()
@@ -385,7 +442,7 @@ if __name__ == "__main__":
     thread.start()
 
     # define discord bot token
-    token = 'NjU4NjgxOTU0MjQxMDg1NDYw.XgI5Lw.CPkNWPaPp4LQqv3Tk4b0fjdkQkw'
+    token = 'NjU4NjgxOTU0MjQxMDg1NDYw.XgJSSg.6jro6soIlaMZIeCktJp_DnZeyeY'
     # token = input('봇 토큰을 입력해주세요: ')
     
     # run bot
