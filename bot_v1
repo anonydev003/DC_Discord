@@ -442,7 +442,7 @@ if __name__ == "__main__":
     thread.start()
 
     # define discord bot token
-    token = 'NjU4NjgxOTU0MjQxMDg1NDYw.XgJWSQ.Eft7wfyEeTDOVCZMxUc5siMvl1Q'
+    token = 'INPUT BOT TOKEN HERE OR USE BELOW'
     # token = input('봇 토큰을 입력해주세요: ')
     
     # run bot
