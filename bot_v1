@@ -204,10 +204,13 @@ def new_content(gallery_name_Kor):
     delete_instance(conn, gallery_name_Kor)
 
     # update table
-    for i in range(len(gallery[1])):
-            script = (gallery[1][i],gallery[2][i],gallery[3][i],gallery[4][i],gallery[5][i],gallery[6][i],gallery[7][i],gallery[8][i])
-            create_instance(conn, gallery_name_Kor, script)
-            i += 1
+    try:
+        for i in range(len(gallery[1])):
+                script = (gallery[1][i],gallery[2][i],gallery[3][i],gallery[4][i],gallery[5][i],gallery[6][i],gallery[7][i],gallery[8][i])
+                create_instance(conn, gallery_name_Kor, script)
+                i += 1
+    except:
+        pass
 
     # return new content
     df2 = pd.read_sql_query("SELECT * from {}".format(gallery_name_Kor), conn)
@@ -228,7 +231,7 @@ def new_content(gallery_name_Kor):
     return gallery_name_Kor, df3
 
 def crawl(gallery_list):
-    global conn, first, content
+    global conn, first, content, add_dict
     
     # connect to database
     conn = create_connection("./DC_Gall.db")
@@ -246,15 +249,17 @@ def crawl(gallery_list):
             content = new_content(gall)
             gall_table = content[0] + "_"
             create_table(conn, create_table_sql2(gall_table))
-            try:
-                for i in range(content[1].shape[0]):
-                    script = (content[1].iloc[i,0], content[1].iloc[i,1], content[1].iloc[i,2])
-                    create_instance2(conn, gall_table, script)
-            except:
-                pass     
+            if add_dict[gall] == 1:
+                add_dict[gall] = 0
+            else:
+                try:
+                    for i in range(content[1].shape[0]):
+                        script = (content[1].iloc[i,0], content[1].iloc[i,1], content[1].iloc[i,2])
+                        create_instance2(conn, gall_table, script)
+                except:
+                    pass  
     else:
         print("Error: 데이터베이스 연결을 확인해주세요.")
-
     # close connection
     conn.close()
 
@@ -277,7 +282,7 @@ async def on_ready():
 
 @client.event
 async def on_message(message):
-    global gall_dict, minor_dict, gallery_list, start
+    global gall_dict, minor_dict, gallery_list, start, delete, add_dict
     if message.author == client.user:
         return
 
@@ -303,6 +308,7 @@ async def on_message(message):
                     await message.channel.send("ㅤ")
                     return
                 add_gallery(gallery)
+                add_dict[gallery] = 1
             except:
                 msg = "갤러리 이름을 확인해주세요."
                 await message.channel.send(msg)
@@ -342,14 +348,6 @@ async def on_message(message):
 
     if message.content == '!시작':
         start = 1
-        try:
-            conn = create_connection("./DC_Gall.db")
-            for gall in gallery_list:
-                gall_table = gall + "_"
-                delete_instance(conn, gall_table)
-            conn.close()
-        except:
-            pass
         while start == 1:
             if len(gallery_list) == 0:
                 pass
@@ -365,7 +363,7 @@ async def on_message(message):
                             msg1 = gall + " 갤러리"
                             for i in range(df.shape[0]):
                                 await message.channel.send(msg1)
-                                msg2 = "제목: {} 글쓴이: {} 날짜: {}".format(df.iloc[i,1],df.iloc[i,2],df.iloc[i,3])
+                                msg2 = "제목: {} 글쓴이: {} 시간: {}".format(df.iloc[i,1],df.iloc[i,2],df.iloc[i,3])
                                 await message.channel.send(msg2) 
                                 await message.channel.send("ㅤ")
                         delete_instance(conn, gall_table)
@@ -422,7 +420,7 @@ def get_gall_dict():
         gall_dict[kor_list[i]] = (eng_list[i],0)
     for j in range(len(eng2_list)):
         gall_dict[kor2_list[j]] = (eng2_list[j],1)
-    gall_dict['다크에덴'] = ('darkeden,1')
+    gall_dict['다크에덴'] = ('darkeden',1)
 
     return gall_dict
 
@@ -430,7 +428,9 @@ if __name__ == "__main__":
     # define global variables
     first = 1
     start = 1
+    delete = 0
     gall_dict = get_gall_dict()
+    add_dict = {}
     
     # define gallery_list
     gallery_list = Manager().list()
@@ -442,7 +442,7 @@ if __name__ == "__main__":
     thread.start()
 
     # define discord bot token
-    token = 'NjU4NjgxOTU0MjQxMDg1NDYw.XgJSSg.6jro6soIlaMZIeCktJp_DnZeyeY'
+    token = 'NjU4NjgxOTU0MjQxMDg1NDYw.XgJWSQ.Eft7wfyEeTDOVCZMxUc5siMvl1Q'
     # token = input('봇 토큰을 입력해주세요: ')
     
     # run bot
