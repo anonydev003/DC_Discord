@@ -96,7 +96,8 @@ def check_gallery(gallery):
    
             return gallery_name, list_number, list_type, list_title, list_num_comment, list_writer, list_date, list_view, list_reco
     except:
-        print("Error: 갤러리이름과 마이너 변수를 확인해주세요.")
+        pass
+        # print("Error: 갤러리이름과 마이너 변수를 확인해주세요.")
 
 def create_connection(db_file):
     conn = None
@@ -282,7 +283,7 @@ async def on_ready():
 
 @client.event
 async def on_message(message):
-    global gall_dict, minor_dict, gallery_list, start, delete, add_dict
+    global gall_dict, minor_dict, gallery_list, start, delete, add_dict, on
     if message.author == client.user:
         return
 
@@ -347,33 +348,38 @@ async def on_message(message):
             await message.channel.send("ㅤ")
 
     if message.content == '!시작':
-        start = 1
-        while start == 1:
-            if len(gallery_list) == 0:
-                pass
-            else:
-                try:
-                    conn = create_connection("./DC_Gall.db")
-                    for gall in gallery_list:
-                        gall_table = gall + "_"
-                        df = pd.read_sql_query("SELECT * from {}".format(gall_table), conn)
-                        if df.size == 0:
-                            pass
-                        else:
-                            msg1 = gall + " 갤러리"
-                            for i in range(df.shape[0]):
-                                await message.channel.send(msg1)
-                                msg2 = "제목: {} 글쓴이: {} 시간: {}".format(df.iloc[i,1],df.iloc[i,2],df.iloc[i,3])
-                                await message.channel.send(msg2) 
-                                await message.channel.send("ㅤ")
-                        delete_instance(conn, gall_table)
-                    conn.close()
-                except:
+        if on == 0:
+            on = 1
+            start = 1
+            while start == 1:
+                if len(gallery_list) == 0:
                     pass
-            await asyncio.sleep(5)
+                else:
+                    try:
+                        conn = create_connection("./DC_Gall.db")
+                        for gall in gallery_list:
+                            gall_table = gall + "_"
+                            df = pd.read_sql_query("SELECT * from {}".format(gall_table), conn)
+                            if df.size == 0:
+                                pass
+                            else:
+                                msg1 = gall + " 갤러리"
+                                for i in range(df.shape[0]):
+                                    await message.channel.send(msg1)
+                                    msg2 = "제목: {} 글쓴이: {} 시간: {}".format(df.iloc[i,1],df.iloc[i,2],df.iloc[i,3])
+                                    await message.channel.send(msg2) 
+                                    await message.channel.send("ㅤ")
+                            delete_instance(conn, gall_table)
+                        conn.close()
+                    except:
+                        pass
+                await asyncio.sleep(5)
         
     if message.content == '!중지':
         start = 0 
+        on = 0
+        for k, v in add_dict.items():
+            add_dict[k] = 1
 
 def get_gall_dict():
     url = 'https://gall.dcinside.com'
@@ -428,6 +434,7 @@ if __name__ == "__main__":
     # define global variables
     first = 1
     start = 1
+    on = 0 
     delete = 0
     gall_dict = get_gall_dict()
     add_dict = {}
@@ -442,7 +449,7 @@ if __name__ == "__main__":
     thread.start()
 
     # define discord bot token
-    token = 'INPUT BOT TOKEN HERE OR USE BELOW'
+    token = 'INPUT YOUR TOKEN'
     # token = input('봇 토큰을 입력해주세요: ')
     
     # run bot
